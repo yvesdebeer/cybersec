@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### CONFIG ###
-SERVER_IP="148.100.112.56"  # <- Vervang dit door het IP van je Flask-server
+SERVER_IP="148.100.79.193"  # <- Vervang dit door het IP van je Flask-server
 LISTENER_PORT=4444
 CALLBACK_PORT=5000
 
