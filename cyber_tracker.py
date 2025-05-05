@@ -6,7 +6,7 @@ app = Flask(__name__)
 status_data = {}
 data_lock = Lock()
 
-# HTML-template met live-status overzicht
+# HTML-template met leesbare sessieduur
 template = """
 <!doctype html>
 <html>
@@ -14,7 +14,7 @@ template = """
   <meta http-equiv="refresh" content="5">
   <title>Cyberresilience Status Tracker</title>
   <style>
-    table { width: 60%; border-collapse: collapse; margin: 20px auto; font-family: sans-serif; }
+    table { width: 70%; border-collapse: collapse; margin: 20px auto; font-family: sans-serif; }
     th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
     th { background: #333; color: #fff; }
     .online { background: #c8f7c5; }
@@ -25,20 +25,27 @@ template = """
 <body>
   <h2 style="text-align:center">Live Student Cyberstatus</h2>
   <table>
-    <tr><th>Student</th><th>IP</th><th>Status</th><th>Last Update</th></tr>
+    <tr><th>Student</th><th>IP</th><th>Status</th><th>Laatste update</th><th>⏱ Duur sessie</th></tr>
     {% for student, info in status_data.items() %}
       {% set ago = now - info['last_seen'] %}
+      {% set duur = now - info['start_time'] %}
+      {% set total_seconds = duur.total_seconds() | int %}
+      {% set hours = total_seconds // 3600 %}
+      {% set minutes = (total_seconds % 3600) // 60 %}
+      {% set seconds = total_seconds % 60 %}
+      {% set formatted_dur = "{:02d}u {:02d}m {:02d}s".format(hours, minutes, seconds) %}
+
       {% if ago > timeout %}
         <tr class="timeout">
-          <td>{{ student }}</td><td>{{ info['ip'] }}</td><td>⏳ Geen update</td><td>{{ info['last_seen'] }}</td>
+          <td>{{ student }}</td><td>{{ info['ip'] }}</td><td>⏳ Geen update</td><td>{{ info['last_seen'] }}</td><td>{{ formatted_dur }}</td>
         </tr>
       {% elif info['status'] == 'secure' %}
         <tr class="online">
-          <td>{{ student }}</td><td>{{ info['ip'] }}</td><td>✅ Secure</td><td>{{ info['last_seen'] }}</td>
+          <td>{{ student }}</td><td>{{ info['ip'] }}</td><td>✅ Secure</td><td>{{ info['last_seen'] }}</td><td>{{ formatted_dur }}</td>
         </tr>
       {% else %}
         <tr class="vulnerable">
-          <td>{{ student }}</td><td>{{ info['ip'] }}</td><td>❌ Kwetsbaar</td><td>{{ info['last_seen'] }}</td>
+          <td>{{ student }}</td><td>{{ info['ip'] }}</td><td>❌ Kwetsbaar</td><td>{{ info['last_seen'] }}</td><td>{{ formatted_dur }}</td>
         </tr>
       {% endif %}
     {% endfor %}
@@ -64,14 +71,21 @@ def update():
 
     if name and status:
         with data_lock:
-            status_data[name] = {
-                'ip': ip,
-                'status': status,
-                'last_seen': datetime.now()
-            }
+            if name not in status_data:
+                # Eerste update → starttijd instellen
+                status_data[name] = {
+                    'ip': ip,
+                    'status': status,
+                    'last_seen': datetime.now(),
+                    'start_time': datetime.now()
+                }
+            else:
+                # Update bestaand record
+                status_data[name]['ip'] = ip
+                status_data[name]['status'] = status
+                status_data[name]['last_seen'] = datetime.now()
         return 'OK'
     return 'Bad Request', 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
-
